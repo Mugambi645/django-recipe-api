@@ -1,27 +1,32 @@
-FROM python:3.13-slim
+FROM ghcr.io/astral-sh/uv:python3.13-alpine
 
 LABEL maintainers="mugambi645developer.com"
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy \
-    UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Create a virtual environment outside /app to protect it from volume overwrites
+RUN uv venv /py
+ENV VIRTUAL_ENV=/py
+ENV PATH="/py/bin:$PATH"
 
-COPY pyproject.toml README.md ./
-RUN uv venv /opt/venv && \
-    uv sync --no-install-project --no-dev --python /opt/venv/bin/python || \
-    uv sync --no-dev --python /opt/venv/bin/python
+# Copy dependency specifications
+COPY pyproject.toml uv.lock* /app/
 
-COPY . .
+# Install dependencies using uv (handles pyproject.toml natively)
+RUN uv sync --frozen --no-install-project || uv sync --no-install-project
 
-RUN uv sync --no-dev --python /opt/venv/bin/python
+# Copy the rest of the application code
+COPY . /app
 
-ENV PATH="/opt/venv/bin:$PATH"
+# Create a non-root user and set permissions
+RUN adduser -D django-user && \
+    chown -R django-user:django-user /app && \
+    chown -R django-user:django-user /py
+
+USER django-user
 
 EXPOSE 8000
 
-CMD ["python", "main.py"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
