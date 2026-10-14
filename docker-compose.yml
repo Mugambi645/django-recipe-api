@@ -1,11 +1,37 @@
-version: "3.9"
-
 services:
   app:
     build:
       context: .
-    ports:
-      - "8000:8000"
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
-    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: app.settings
+      DEBUG: "1"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0"
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:

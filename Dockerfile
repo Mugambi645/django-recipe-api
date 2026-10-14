@@ -2,30 +2,20 @@ FROM ghcr.io/astral-sh/uv:python3.13-alpine
 
 LABEL maintainers="mugambi645developer.com"
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
 
 WORKDIR /app
 
-# Create a virtual environment outside /app to protect it from volume overwrites
-RUN uv venv /py
-ENV VIRTUAL_ENV=/py
-ENV PATH="/py/bin:$PATH"
+COPY pyproject.toml uv.lock* ./
+RUN uv venv /opt/venv && \
+    uv sync --frozen --all-groups --no-install-project
 
-# Copy dependency specifications
-COPY pyproject.toml uv.lock* /app/
+COPY . .
+RUN uv sync --frozen --all-groups
 
-# Install dependencies using uv (handles pyproject.toml natively)
-RUN uv sync --frozen --no-install-project || uv sync --no-install-project
-
-# Copy the rest of the application code
-COPY . /app
-
-# Create a non-root user and set permissions
-RUN adduser -D django-user && \
-    chown -R django-user:django-user /app && \
-    chown -R django-user:django-user /py
-
-USER django-user
+ENV PATH="/opt/venv/bin:$PATH"
 
 EXPOSE 8000
 
